@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Hive Token - Enhanced Bee Colony Simulation</title>
+  <title>Hive Token - Ultra Enhanced Bee Colony Simulation</title>
   <style>
     /* Basic Page Reset */
     html, body {
@@ -20,8 +20,8 @@
       position: relative;
       width: 3000px;
       height: 2000px;
-      /* Simulate sky-to-grass: light blue sky on top, green grass at bottom */
       background: linear-gradient(to bottom, #87CEEB, #228B22);
+      overflow: hidden;
     }
 
     /* Control Panel (fixed) */
@@ -29,15 +29,16 @@
       position: fixed;
       top: 10px;
       left: 10px;
-      background: rgba(0,0,0,0.6);
+      background: rgba(0,0,0,0.7);
       padding: 12px;
       border: 1px solid #888;
       border-radius: 6px;
-      z-index: 9999;
-      width: 240px;
+      z-index: 10000;
+      width: 260px;
     }
     #controlPanel h3 {
       margin: 0 0 6px;
+      font-size: 1.2em;
     }
     #controlPanel p {
       margin: 4px 0;
@@ -78,28 +79,33 @@
       box-sizing: border-box;
     }
 
-    /* Bee Element Style */
+    /* Bee Element: container for each bee */
     .bee {
       position: absolute;
       pointer-events: auto;
       user-select: none;
-      font-size: 1.5rem;
-      /* Although we update position via JS, the bobbing effect is applied on top */
-      /* A drop-shadow gives a little depth to the bee emoji */
-      text-shadow: 1px 1px 2px #000;
+      /* The translation is handled by JS; the inner element animates flapping. */
     }
-    /* Queen Bee style */
-    .queen {
+
+    /* Bee image: inner element with flapping animation */
+    .bee-img {
+      font-size: 1.5rem;
+      text-shadow: 1px 1px 2px #000;
+      display: inline-block;
+      animation: flap 1s infinite alternate ease-in-out;
+    }
+    /* Queen Bee styling */
+    .queen .bee-img {
       font-size: 2.5rem;
-      color: #FFD700; /* Gold */
+      color: #FFD700;
       font-weight: bold;
     }
-    /* User Bee style */
-    .user-bee {
+    /* User Bee styling */
+    .user-bee .bee-img {
       color: #55ff55 !important;
     }
 
-    /* The hive (honeycomb zone) */
+    /* Hive (Honeycomb Zone) */
     .hive {
       position: absolute;
       border: 2px dashed #ccc;
@@ -128,13 +134,13 @@
       position: fixed;
       top: 10px;
       right: 10px;
-      width: 200px;
-      background: rgba(0,0,0,0.6);
+      width: 220px;
+      background: rgba(0,0,0,0.7);
       border: 1px solid #888;
       border-radius: 6px;
       padding: 10px;
       display: none;
-      z-index: 9999;
+      z-index: 10000;
     }
     #beeInfoPanel h4 {
       margin: 0 0 6px;
@@ -166,6 +172,24 @@
       height: 190px;
       border: 1px solid #999;
     }
+
+    /* Flower styling for nectar mode */
+    .flower {
+      position: absolute;
+      font-size: 2rem;
+      pointer-events: none;
+      animation: fadeOut 5s forwards;
+    }
+    @keyframes fadeOut {
+      0% { opacity: 1; transform: scale(1); }
+      100% { opacity: 0; transform: scale(1.5); }
+    }
+
+    /* Bee flapping animation */
+    @keyframes flap {
+      0% { transform: scale(1); }
+      100% { transform: scale(1.1); }
+    }
   </style>
 </head>
 <body>
@@ -188,7 +212,7 @@
   <!-- Bee World Container -->
   <div id="beesContainer"></div>
 
-  <!-- The hive (honeycomb zone) -->
+  <!-- Hive (Honeycomb Zone) -->
   <div class="hive" id="hiveZone"></div>
 
   <!-- Tooltip -->
@@ -223,11 +247,10 @@
     // For collisions & forces
     const COLLISION_RADIUS = 30;
     const BOUNCE_FORCE = 0.02;
-    const FRICTION = 0.98; // damping factor per frame
+    const FRICTION = 0.98; // damping factor
 
-    // Initially, spawn a small colony (total bees: between 1 and 5).
-    // If only 1 bee, it will be the queen. Otherwise, always have one queen and the rest as workers.
-    let initialBeeCount = Math.floor(Math.random() * 5) + 1; // random between 1 and 5
+    // Initially, spawn a small colony (1-5 bees). If only one bee, it is the queen.
+    let initialBeeCount = Math.floor(Math.random() * 5) + 1; 
 
     let bees = []; // Array to hold bee objects
     let queenBee = null;
@@ -235,22 +258,22 @@
     let nectarY = null;
     let nectarMode = false;
     let nectarTimer = null;
+    let pollenCount = 0; // Increments each time nectar mode is triggered
+    let simulationStart = Date.now();
 
     // References to DOM elements
     const beesContainer = document.getElementById('beesContainer');
-    const hiveZone      = document.getElementById('hiveZone');
-    const tooltipEl     = document.getElementById('tooltip');
-    const colonyStats   = document.getElementById('colonyStats');
-
-    const beeInfoPanel   = document.getElementById('beeInfoPanel');
-    const infoCategory   = document.getElementById('infoCategory');
-    const infoAddress    = document.getElementById('infoAddress');
-    const infoBalance    = document.getElementById('infoBalance');
-    const infoTime       = document.getElementById('infoTime');
-
-    const speedRange   = document.getElementById('speedRange');
-    const walletInput  = document.getElementById('walletInput');
-    const addMyBeeBtn  = document.getElementById('addMyBeeBtn');
+    const hiveZone = document.getElementById('hiveZone');
+    const tooltipEl = document.getElementById('tooltip');
+    const colonyStats = document.getElementById('colonyStats');
+    const beeInfoPanel = document.getElementById('beeInfoPanel');
+    const infoCategory = document.getElementById('infoCategory');
+    const infoAddress = document.getElementById('infoAddress');
+    const infoBalance = document.getElementById('infoBalance');
+    const infoTime = document.getElementById('infoTime');
+    const speedRange = document.getElementById('speedRange');
+    const walletInput = document.getElementById('walletInput');
+    const addMyBeeBtn = document.getElementById('addMyBeeBtn');
 
     // Categories for fake bees
     const categories = [
@@ -296,58 +319,60 @@
      * 3) CREATE / CLEAR BEES & HIVE SETUP
      **************************************************/
     function createBee(isQueen = false, isUser = false, walletAddr = "", catObj = null) {
-      const beeEl = document.createElement('div');
-      beeEl.className = 'bee';
+      // Create container div for the bee
+      const beeContainer = document.createElement('div');
+      beeContainer.className = 'bee';
+      if (isQueen) beeContainer.classList.add('queen');
+      if (isUser) beeContainer.classList.add('user-bee');
+
+      // Create inner element for the bee image (with flapping animation)
+      const beeImg = document.createElement('span');
+      beeImg.className = 'bee-img';
+      beeImg.textContent = '🐝';
+      beeContainer.appendChild(beeImg);
 
       let category;
       if (isQueen) {
-        beeEl.classList.add('queen');
         category = { type: 'Queen Bee', color: '#FFD700' };
       } else if (isUser) {
-        beeEl.classList.add('user-bee');
         category = { type: 'User Bee', color: '#55ff55' };
       } else {
         category = catObj || categories[Math.floor(Math.random() * categories.length)];
-        beeEl.style.color = category.color;
+        beeImg.style.color = category.color;
       }
 
-      // Random position within the world
-      const x = randomRange(0, WORLD_WIDTH - 10);
-      const y = randomRange(0, WORLD_HEIGHT - 10);
+      // Random initial position
+      const x = randomRange(0, WORLD_WIDTH - 50);
+      const y = randomRange(0, WORLD_HEIGHT - 50);
       const speedVal = parseFloat(speedRange.value);
       const vx = randomRange(-speedVal, speedVal);
       const vy = randomRange(-speedVal, speedVal);
 
       // Wallet & balance info
-      let address  = walletAddr ? walletAddr : generateFakeWallet();
-      let balance  = getRandomBalance();
+      let address = walletAddr ? walletAddr : generateFakeWallet();
+      let balance = getRandomBalance();
       const birthTime = Date.now();
 
-      // Use a bee emoji to represent the bee
-      beeEl.textContent = '🐝';
-
-      // Tooltip events on hover
-      beeEl.addEventListener('mouseenter', (e) => {
+      // Tooltip events
+      beeContainer.addEventListener('mouseenter', (e) => {
         showTooltip(e.clientX, e.clientY, category, address, balance);
       });
-      beeEl.addEventListener('mousemove', (e) => {
+      beeContainer.addEventListener('mousemove', (e) => {
         moveTooltip(e.clientX, e.clientY);
       });
-      beeEl.addEventListener('mouseleave', () => {
-        hideTooltip();
-      });
+      beeContainer.addEventListener('mouseleave', hideTooltip);
 
-      // On click, open the Bee Info Panel
-      beeEl.addEventListener('click', (e) => {
+      // On click, open Bee Info Panel
+      beeContainer.addEventListener('click', (e) => {
         e.stopPropagation();
         openBeeInfoPanel(category, address, balance, birthTime);
       });
 
-      beesContainer.appendChild(beeEl);
+      beesContainer.appendChild(beeContainer);
 
       return {
         x, y, vx, vy,
-        el: beeEl,
+        el: beeContainer,
         isQueen,
         isUser,
         category,
@@ -359,17 +384,14 @@
 
     // Spawn the initial colony.
     function spawnInitialColony() {
-      // If only one bee is to be spawned, make it the queen.
       if (initialBeeCount === 1) {
         const queen = createBee(true, false, "", null);
         bees.push(queen);
         queenBee = queen;
       } else {
-        // Always spawn one queen.
         const queen = createBee(true, false, "", null);
         bees.push(queen);
         queenBee = queen;
-        // Spawn the remaining bees as workers.
         for (let i = 1; i < initialBeeCount; i++) {
           bees.push(createBee(false, false, "", null));
         }
@@ -382,18 +404,15 @@
     }
 
     function clearAllBees() {
-      bees.forEach(b => {
-        beesContainer.removeChild(b.el);
-      });
+      bees.forEach(b => beesContainer.removeChild(b.el));
       bees = [];
       queenBee = null;
     }
 
     function setupHive() {
-      // Position & size of the hive (honeycomb zone)
-      hiveZone.style.left   = (hiveX - hiveRadius) + 'px';
-      hiveZone.style.top    = (hiveY - hiveRadius) + 'px';
-      hiveZone.style.width  = (hiveRadius * 2) + 'px';
+      hiveZone.style.left = (hiveX - hiveRadius) + 'px';
+      hiveZone.style.top = (hiveY - hiveRadius) + 'px';
+      hiveZone.style.width = (hiveRadius * 2) + 'px';
       hiveZone.style.height = (hiveRadius * 2) + 'px';
     }
 
@@ -402,19 +421,19 @@
      **************************************************/
     function updateBees() {
       bees.forEach(bee => {
-        // If nectar (a flower) is present, bees are attracted to it.
+        // If nectar (flower) is present, bees are attracted to it.
         if (nectarMode && nectarX !== null && nectarY !== null) {
           const dx = nectarX - bee.x;
           const dy = nectarY - bee.y;
-          bee.vx += dx * 0.0002;
-          bee.vy += dy * 0.0002;
+          bee.vx += dx * 0.0003;
+          bee.vy += dy * 0.0003;
         } else if (!bee.isQueen) {
           // Gently pull bees toward the hive center.
           let dx = hiveX - bee.x;
           let dy = hiveY - bee.y;
           bee.vx += dx * 0.00003;
           bee.vy += dy * 0.00003;
-          // Also a slight pull toward the queen bee.
+          // Slight pull toward the queen bee.
           if (!nectarMode && queenBee) {
             let dxQ = queenBee.x - bee.x;
             let dyQ = queenBee.y - bee.y;
@@ -422,23 +441,19 @@
             bee.vy += dyQ * 0.00001;
           }
         }
-        // Update position with current velocity.
+        // Update position.
         bee.x += bee.vx;
         bee.y += bee.vy;
 
-        // Apply friction to slow bees gradually.
+        // Apply friction.
         bee.vx *= FRICTION;
         bee.vy *= FRICTION;
 
-        // Bounce off the boundaries of the bee world.
-        if (bee.x < 0 || bee.x > WORLD_WIDTH - 10) {
-          bee.vx *= -1;
-        }
-        if (bee.y < 0 || bee.y > WORLD_HEIGHT - 10) {
-          bee.vy *= -1;
-        }
-        bee.x = clamp(bee.x, 0, WORLD_WIDTH - 10);
-        bee.y = clamp(bee.y, 0, WORLD_HEIGHT - 10);
+        // Bounce off boundaries.
+        if (bee.x < 0 || bee.x > WORLD_WIDTH - 50) { bee.vx *= -1; }
+        if (bee.y < 0 || bee.y > WORLD_HEIGHT - 50) { bee.vy *= -1; }
+        bee.x = clamp(bee.x, 0, WORLD_WIDTH - 50);
+        bee.y = clamp(bee.y, 0, WORLD_HEIGHT - 50);
       });
 
       // Handle collisions between bees.
@@ -459,10 +474,9 @@
         }
       }
 
-      // Update bee positions with an added bobbing effect.
+      // Update bee positions with a bobbing effect.
       bees.forEach(bee => {
-        // Bobbing: a small sine-wave offset based on the current time and bee's birthTime.
-        const bobbing = Math.sin(Date.now() / 200 + bee.birthTime / 1000) * 3;
+        const bobbing = Math.sin((Date.now() / 200) + (bee.birthTime / 1000)) * 3;
         bee.el.style.transform = `translate(${bee.x}px, ${bee.y + bobbing}px)`;
       });
     }
@@ -473,6 +487,7 @@
     function animate() {
       updateBees();
       drawMiniMap();
+      updateStats();
       requestAnimationFrame(animate);
     }
 
@@ -534,11 +549,9 @@
       document.getElementById('infoCategory').textContent = `Category: ${category.type}`;
       document.getElementById('infoAddress').textContent  = `Address: ${address}`;
       document.getElementById('infoBalance').textContent  = `Balance: ${balance} TOKEN`;
-
       const ageSec = Math.floor((Date.now() - birthTime) / 1000);
       document.getElementById('infoTime').textContent = `Time in colony: ${formatTime(ageSec)}`;
     }
-    // Hide Bee Info Panel when clicking outside a bee.
     document.addEventListener('click', (e) => {
       if (e.target.closest('.bee')) return;
       if (!e.target.closest('#beeInfoPanel')) {
@@ -547,13 +560,26 @@
     }, true);
 
     /**************************************************
-     * 8) NECTAR MODE: CLICK ANYWHERE IN THE BEE WORLD
+     * 8) NECTAR MODE & FLOWER ANIMATION
      **************************************************/
     beesContainer.addEventListener('click', (e) => {
       const rect = beesContainer.getBoundingClientRect();
       nectarX = e.clientX - rect.x;
       nectarY = e.clientY - rect.y;
       nectarMode = true;
+      pollenCount++; // Increment pollen count each time nectar is triggered
+
+      // Create a flower element at the click location.
+      const flower = document.createElement('div');
+      flower.className = 'flower';
+      flower.textContent = '🌸';
+      flower.style.left = (nectarX - 15) + 'px';
+      flower.style.top = (nectarY - 15) + 'px';
+      beesContainer.appendChild(flower);
+      // Remove the flower after 5 seconds.
+      setTimeout(() => {
+        beesContainer.removeChild(flower);
+      }, 5000);
 
       if (nectarTimer) clearTimeout(nectarTimer);
       nectarTimer = setTimeout(() => {
@@ -566,7 +592,6 @@
     /**************************************************
      * 9) WIND GUST SIMULATION
      **************************************************/
-    // Every 7 seconds, apply a small random velocity boost ("wind gust") to each bee.
     setInterval(() => {
       bees.forEach(bee => {
         bee.vx += randomRange(-0.05, 0.05);
@@ -575,10 +600,13 @@
     }, 7000);
 
     /**************************************************
-     * 10) UI EVENTS
+     * 10) UI EVENTS & STATS UPDATE
      **************************************************/
     function updateStats() {
-      colonyStats.textContent = `Bees: ${bees.length}, Speed: ${speedRange.value}`;
+      const elapsedSec = Math.floor((Date.now() - simulationStart) / 1000);
+      const minutes = Math.floor(elapsedSec / 60);
+      const seconds = elapsedSec % 60;
+      colonyStats.textContent = `Bees: ${bees.length}, Speed: ${speedRange.value}, Pollen: ${pollenCount}, Time: ${minutes}m ${seconds < 10 ? '0' : ''}${seconds}s`;
     }
     addMyBeeBtn.addEventListener('click', () => {
       const userWallet = walletInput.value.trim();
@@ -587,7 +615,6 @@
         return;
       }
       addUserBee(userWallet);
-      updateStats();
       walletInput.value = "";
     });
     speedRange.addEventListener('input', updateStats);
